@@ -1,0 +1,90 @@
+import requests
+import pandas as pd
+import networkx as nx
+import matplotlib.pyplot as plt
+import time
+
+# Define YouTube API key (replace with your actual API key)
+API_KEY = 'your_youtube_api_key'
+
+# Function to get channel details using YouTube API
+def get_channel_info(channel_id):
+    url = f'https://www.googleapis.com/youtube/v3/channels?part=statistics&id={channel_id}&key={API_KEY}'
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        if 'items' in data and len(data['items']) > 0:
+            return data['items'][0]['statistics']
+    return None
+
+# Example channel IDs for demo (replace with real YouTube channel IDs)
+channel_ids = ['UC_x5XG1OV2P6uZZ5FSM9Ttw', 'UCsT0YIqwnpJCM-mx7-gSA4Q', 'UCEBb1b_L6zDS3xTUrIALZOw']
+
+# Collect data for each channel
+channel_data = []
+for channel_id in channel_ids:
+    info = get_channel_info(channel_id)
+    if info:
+        channel_data.append({
+            'Channel ID': channel_id,
+            'Subscribers': int(info['subscriberCount']),
+            'Video Count': int(info['videoCount']),
+            'View Count': int(info['viewCount'])
+        })
+    time.sleep(1)  # To avoid hitting the API rate limit
+
+# Convert to DataFrame for easy handling
+df = pd.DataFrame(channel_data)
+
+# Example collaborations (in a real scenario, extract this data through scraping or YouTube API)
+collaborations = [('UC_x5XG1OV2P6uZZ5FSM9Ttw', 'UCsT0YIqwnpJCM-mx7-gSA4Q'),
+                  ('UCsT0YIqwnpJCM-mx7-gSA4Q', 'UCEBb1b_L6zDS3xTUrIALZOw'),
+                  ('UC_x5XG1OV2P6uZZ5FSM9Ttw', 'UCEBb1b_L6zDS3xTUrIALZOw')]
+
+# Create a graph using NetworkX
+G = nx.Graph()
+
+# Add nodes (YouTube channels)
+for index, row in df.iterrows():
+    G.add_node(row['Channel ID'], subscribers=row['Subscribers'], videos=row['Video Count'], views=row['View Count'])
+
+# Add edges (collaborations)
+for col in collaborations:
+    G.add_edge(col[0], col[1])
+
+# Calculate centrality metrics
+degree_centrality = nx.degree_centrality(G)
+betweenness_centrality = nx.betweenness_centrality(G)
+eigenvector_centrality = nx.eigenvector_centrality(G)
+
+# Add centrality metrics to DataFrame
+df['Degree Centrality'] = df['Channel ID'].map(degree_centrality)
+df['Betweenness Centrality'] = df['Channel ID'].map(betweenness_centrality)
+df['Eigenvector Centrality'] = df['Channel ID'].map(eigenvector_centrality)
+
+# Visualize the network graph
+plt.figure(figsize=(10, 8))
+pos = nx.spring_layout(G)
+nx.draw(G, pos, with_labels=True, node_color='skyblue', node_size=3000, font_size=10, font_weight='bold')
+plt.title("YouTube Collaboration Network")
+plt.show()
+
+# Bar chart for Degree Centrality
+plt.bar(df['Channel ID'], df['Degree Centrality'], color='blue')
+plt.title('Degree Centrality of YouTube Channels')
+plt.ylabel('Degree Centrality')
+plt.show()
+
+# Bar chart for Betweenness Centrality
+plt.bar(df['Channel ID'], df['Betweenness Centrality'], color='green')
+plt.title('Betweenness Centrality of YouTube Channels')
+plt.ylabel('Betweenness Centrality')
+plt.show()
+
+# Save DataFrame to CSV for easy sharing
+df.to_csv('youtube_channel_metrics.csv', index=False)
+
+# Optional: Save a DataFrame table as HTML for use in Medium post
+df.to_html('youtube_channel_metrics_table.html')
+
+print(df)
